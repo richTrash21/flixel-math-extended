@@ -1,10 +1,9 @@
 package flixel.math;
 
 import openfl.geom.Rectangle;
+import flixel.util.FlxColor;
 #if !macro
-#if FLX_MOUSE
 import flixel.FlxG;
-#end
 import flixel.FlxSprite;
 #if FLX_TOUCH
 import flixel.input.touch.FlxTouch;
@@ -110,6 +109,112 @@ class FlxMath
 	}
 
 	/**
+	 * Returns the linear interpolation/extrapolation of two points.
+	 * Works the same way as this expression:
+	 *
+	 * ```haxe
+	 * var result = FlxPoint.get(lerp(a.x, b.x, ratio), lerp(a.y, b.y, ratio))
+	 * ```
+	 * 
+	 * @see				FlxMath.lerp()
+	 * @param result	Optional arg for the returning point
+	 */
+	public static inline function lerpPoint(a:FlxPoint, b:FlxPoint, ratio:Float, ?result:FlxPoint):FlxPoint
+	{
+		if (result == null)
+			result = FlxPoint.get();
+
+		result.set(lerp(a.x, b.x, ratio), lerp(a.y, b.y, ratio));
+		a.putWeak();
+		b.putWeak();
+		return result;
+	}
+
+	/**
+	 * Returns the linear interpolation of two colors.
+	 * Works the same way as `FlxColor.interpolate` method.
+	 * 
+	 * @see FlxMath.lerp
+	 * @see FlxColor.interpolate
+	 */
+	public static inline function lerpColor(a:FlxColor, b:FlxColor, ratio:Float):FlxColor
+	{
+		final TO_PERCENT = 1 / 255;
+		return FlxColor.fromRGBFloat(
+			lerp(a.red,   b.red,   ratio) * TO_PERCENT,
+			lerp(a.green, b.green, ratio) * TO_PERCENT,
+			lerp(a.blue,  b.blue,  ratio) * TO_PERCENT,
+			lerp(a.alpha, b.alpha, ratio) * TO_PERCENT
+		);
+	}
+
+	#if !macro
+	/**
+	 * TODO: doc
+	 */
+	public static inline function lerpElapsed(a:Float, b:Float, ratio:Float, ?elapsed:Float):Float
+	{
+		if (FlxMath.equal(a, b))
+			return b;
+		
+		return FlxMath.lerp(a, b, FlxMath.elapsedLerpRatio(ratio, elapsed));
+	}
+
+	/**
+	 * TODO: doc
+	 */
+	public static inline function lerpPointElapsed(a:FlxPoint, b:FlxPoint, ratio:Float, ?result:FlxPoint, ?elapsed:Float):FlxPoint
+	{
+		if (result == null)
+			result = FlxPoint.get();
+
+		if (FlxMath.equal(a.x, b.x) && FlxMath.equal(a.y, b.y))
+		{
+			result.copyFrom(b);
+		}
+		else
+		{
+			ratio = FlxMath.elapsedLerpRatio(ratio, elapsed);
+			result.set(FlxMath.lerp(a.x, b.x, ratio), FlxMath.lerp(a.y, b.y, ratio));
+		}
+		a.putWeak();
+		b.putWeak();
+		return result;
+	}
+
+	/**
+	 * TODO: doc
+	 */
+	public static inline function lerpColorElapsed(a:FlxColor, b:FlxColor, ratio:Float, ?elapsed:Float):FlxColor
+	{
+		if (a == b)
+			return b;
+
+		return FlxMath.lerpColor(a, b, FlxMath.elapsedLerpRatio(ratio, elapsed));
+	}
+
+	/**
+	 * Adjusts lerp ratio based on how much time has passed since the last frame
+	 * so lerp is less framerate dependant.
+	 */
+	public static inline function elapsedLerpRatio(ratio:Float, ?elapsed:Float):Float
+	{
+		if (elapsed == null)
+			elapsed = FlxG.elapsed;
+
+		var adjustedRatio = 0.0;
+		// had to bound it to a range of 0.0 to 1.0 because a ratio > 1.0
+		// ot elapsed != 1 / 60 gives a NaN value
+		if (ratio >= 1.0)
+			adjustedRatio = 1.0;
+		else if (ratio > 0.0 && elapsed > 0.0)
+			adjustedRatio = 1.0 - Math.pow(1.0 - ratio, elapsed * 60);
+
+		return adjustedRatio;
+	}
+	#end
+
+	/**
 	 * Checks if number is in defined range. A null bound means that side is unbounded.
 	 *
 	 * @param Value		Number to check.
@@ -117,7 +222,7 @@ class FlxMath
 	 * @param Max 		Higher bound of range.
 	 * @return Returns true if Value is in range.
 	 */
-	public static inline function inBounds(Value:Float, Min:Null<Float>, Max:Null<Float>):Bool
+	public static inline function inBounds(Value:Float, ?Min:Float, ?Max:Float):Bool
 	{
 		return (Min == null || Value >= Min) && (Max == null || Value <= Max);
 	}
@@ -166,16 +271,9 @@ class FlxMath
 	 *
 	 * @return	true if pointX/pointY is within the region, otherwise false
 	 */
-	public static function pointInCoordinates(pointX:Float, pointY:Float, rectX:Float, rectY:Float, rectWidth:Float, rectHeight:Float):Bool
+	public static inline function pointInCoordinates(pointX:Float, pointY:Float, rectX:Float, rectY:Float, rectWidth:Float, rectHeight:Float):Bool
 	{
-		if (pointX >= rectX && pointX <= (rectX + rectWidth))
-		{
-			if (pointY >= rectY && pointY <= (rectY + rectHeight))
-			{
-				return true;
-			}
-		}
-		return false;
+		return pointX >= rectX && pointX <= (rectX + rectWidth) && pointY >= rectY && pointY <= (rectY + rectHeight);
 	}
 
 	/**
@@ -186,7 +284,7 @@ class FlxMath
 	 * @param	rect		The FlxRect to test within
 	 * @return	true if pointX/pointY is within the FlxRect, otherwise false
 	 */
-	public static function pointInFlxRect(pointX:Float, pointY:Float, rect:FlxRect):Bool
+	public static inline function pointInFlxRect(pointX:Float, pointY:Float, rect:FlxRect):Bool
 	{
 		return rect.containsXY(pointX, pointY);
 	}
@@ -226,7 +324,7 @@ class FlxMath
 	 * @param	rect		The Rectangle to test within
 	 * @return	true if pointX/pointY is within the Rectangle, otherwise false
 	 */
-	public static function pointInRectangle(pointX:Float, pointY:Float, rect:Rectangle):Bool
+	public static inline function pointInRectangle(pointX:Float, pointY:Float, rect:Rectangle):Bool
 	{
 		return pointX >= rect.x && pointX <= rect.right && pointY >= rect.y && pointY <= rect.bottom;
 	}
@@ -241,7 +339,7 @@ class FlxMath
 	 * @param 	min 	The minimum the value is allowed to be
 	 * @return The new value
 	 */
-	public static function maxAdd(value:Int, amount:Int, max:Int, min:Int = 0):Int
+	public static inline function maxAdd(value:Int, amount:Int, max:Int, min:Int = 0):Int
 	{
 		value += amount;
 
@@ -249,7 +347,7 @@ class FlxMath
 		{
 			value = max;
 		}
-		else if (value <= min)
+		else if (value < min)
 		{
 			value = min;
 		}
@@ -286,7 +384,7 @@ class FlxMath
 	 * @param 	stop2 	Upper bound of the value's target range
 	 * @return The remapped value
 	 */
-	public static function remapToRange(value:Float, start1:Float, stop1:Float, start2:Float, stop2:Float):Float
+	public static inline function remapToRange(value:Float, start1:Float, stop1:Float, start2:Float, stop2:Float):Float
 	{
 		return start2 + (value - start1) * ((stop2 - start2) / (stop1 - start1));
 	}
@@ -313,6 +411,7 @@ class FlxMath
 	{
 		return Math.sqrt(dx * dx + dy * dy);
 	}
+
 	#if !macro
 	/**
 	 * Find the distance (in pixels, rounded) between two FlxSprites, taking their origin into account
@@ -464,17 +563,11 @@ class FlxMath
 	/**
 	 * Returns the amount of decimals a `Float` has.
 	 */
-	public static function getDecimals(n:Float):Int
+	public static inline function getDecimals(n:Float):Int
 	{
-		var helperArray:Array<String> = Std.string(n).split(".");
-		var decimals:Int = 0;
-
-		if (helperArray.length > 1)
-		{
-			decimals = helperArray[1].length;
-		}
-
-		return decimals;
+		final helperString = Std.string(n);
+		final dotIndex = helperString.indexOf(".");
+		return (dotIndex == -1 ? 0 : helperString.length - dotIndex - 1);
 	}
 
 	public static inline function equal(aValueA:Float, aValueB:Float, aDiff:Float = EPSILON):Bool
